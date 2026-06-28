@@ -76,9 +76,16 @@ def _add(args: argparse.Namespace, ui: TerminalUI) -> int:
 def _upload(args: argparse.Namespace, ui: TerminalUI) -> int:
     ui.banner()
     with ui.spinner("Uploading EPUB", "Upload complete"):
-        response = CalibreWebUploader(_calibre_config(args)).upload(Path(args.epub))
-    print(response or "uploaded")
-    return 0
+        result = CalibreWebUploader(_calibre_config(args)).upload_result(Path(args.epub))
+    ui.success("Uploaded to Calibre-Web")
+    if result.book_url:
+        ui.info(f"Book: {result.book_url}")
+    for shelf_name in result.shelves_added:
+        ui.success(f"Added to shelf: {shelf_name}")
+    for error in result.shelf_errors:
+        ui.warning(error)
+    print(result.book_url or result.location or "uploaded")
+    return 1 if result.shelf_errors else 0
 
 
 def _doctor(args: argparse.Namespace, ui: TerminalUI) -> int:
@@ -116,6 +123,7 @@ def _calibre_config(args: argparse.Namespace) -> CalibreConfig:
         username=args.calibre_username,
         password=args.calibre_password,
         api_key=args.calibre_api_key,
+        shelf_names=args.calibre_shelf or [],
     )
 
 
@@ -163,6 +171,7 @@ def _add_calibre_args(parser: argparse.ArgumentParser, require_url: bool) -> Non
     parser.add_argument("--calibre-username")
     parser.add_argument("--calibre-password")
     parser.add_argument("--calibre-api-key")
+    parser.add_argument("--calibre-shelf", action="append", help="Add uploaded book to a Calibre-Web shelf by name. Repeat for multiple shelves.")
 
 
 def _add_log_level(parser: argparse.ArgumentParser) -> None:

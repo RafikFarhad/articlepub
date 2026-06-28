@@ -43,3 +43,4 @@ class CalibreConfig:
     username: str | None = None
     password: str | None = None
     api_key: str | None = None
+    shelf_names: list[str] = field(default_factory=list)

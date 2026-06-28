@@ -9,6 +9,7 @@ python -m articlepub add https://www.rafikfarhad.me/ --out dist
 python -m articlepub add https://www.rafikfarhad.me/ --provider anthropic --api-key "$ANTHROPIC_API_KEY"
 python -m articlepub add https://www.rafikfarhad.me/ --fetch-mode llm --provider anthropic --api-key "$ANTHROPIC_API_KEY"
 python -m articlepub add https://www.rafikfarhad.me/ --calibre-url https://calibre.example.com --calibre-username user --calibre-password pass
+python -m articlepub upload --calibre-url https://calibre.example.com --calibre-shelf "Long Reads" dist/article.epub
 python -m articlepub tui
 ```
 
@@ -65,6 +66,7 @@ python -m articlepub doctor https://www.rafikfarhad.me/ --doctor-timeout 10
 | `--calibre-username` | Conditional | None | Optional for anonymous upload; must be paired with `--calibre-password` when used. |
 | `--calibre-password` | Conditional | None | Optional for anonymous upload; must be paired with `--calibre-username` when used. |
 | `--calibre-api-key` | No | None | Optional Calibre-Web API token header. |
+| `--calibre-shelf` | No | None | Add the uploaded book to a Calibre-Web shelf by name. Repeat for multiple shelves; quote names containing spaces. |
 | `--doctor` | No | `false` | `add` only. Validates flags/config and exits instead of building. |
 
 ## Fetch Modes

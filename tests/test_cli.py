@@ -6,6 +6,7 @@ from unittest import TestCase
 from unittest.mock import patch
 
 from articlepub.cli import main
+from articlepub.upload import UploadResult
 
 
 FIXTURE = Path(__file__).parent / "fixtures" / "blog.html"
@@ -251,3 +252,77 @@ class CliTest(TestCase):
             output = stderr.getvalue()
             self.assertNotIn("file-token-secret", output)
             self.assertIn("token=[REDACTED]", output)
+
+    def test_upload_prints_book_url_instead_of_raw_json(self) -> None:
+        with TemporaryDirectory() as tmp:
+            epub = Path(tmp) / "book.epub"
+            epub.write_bytes(b"epub")
+            stdout = io.StringIO()
+            stderr = io.StringIO()
+            upload_result = UploadResult(
+                response_text='{"location": "/calibre-web/book/35"}',
+                location="/calibre-web/book/35",
+                book_id=35,
+                book_url="http://calibre.example.test/calibre-web/book/35",
+                shelves_added=["Long Reads"],
+            )
+
+            with patch("articlepub.cli.CalibreWebUploader") as uploader_cls:
+                uploader_cls.return_value.upload_result.return_value = upload_result
+                with redirect_stdout(stdout), redirect_stderr(stderr):
+                    code = main(
+                        [
+                            "upload",
+                            "--calibre-url",
+                            "http://calibre.example.test/calibre-web/",
+                            "--calibre-shelf",
+                            "Long Reads",
+                            "--log-level",
+                            "debug",
+                            str(epub),
+                        ]
+                    )
+
+        self.assertEqual(code, 0)
+        self.assertEqual(stdout.getvalue(), "http://calibre.example.test/calibre-web/book/35\n")
+        self.assertIn("OK    Uploaded to Calibre-Web", stderr.getvalue())
+        self.assertIn("INFO  Book: http://calibre.example.test/calibre-web/book/35", stderr.getvalue())
+        self.assertIn("OK    Added to shelf: Long Reads", stderr.getvalue())
+        config = uploader_cls.call_args.args[0]
+        self.assertEqual(config.shelf_names, ["Long Reads"])
+
+    def test_upload_reports_book_url_when_shelf_add_fails(self) -> None:
+        with TemporaryDirectory() as tmp:
+            epub = Path(tmp) / "book.epub"
+            epub.write_bytes(b"epub")
+            stdout = io.StringIO()
+            stderr = io.StringIO()
+            upload_result = UploadResult(
+                response_text='{"location": "/calibre-web/book/35"}',
+                location="/calibre-web/book/35",
+                book_id=35,
+                book_url="http://calibre.example.test/calibre-web/book/35",
+                shelf_errors=["Calibre-Web did not expose shelf actions for this book; shelf changes may require login"],
+            )
+
+            with patch("articlepub.cli.CalibreWebUploader") as uploader_cls:
+                uploader_cls.return_value.upload_result.return_value = upload_result
+                with redirect_stdout(stdout), redirect_stderr(stderr):
+                    code = main(
+                        [
+                            "upload",
+                            "--calibre-url",
+                            "http://calibre.example.test/calibre-web/",
+                            "--calibre-shelf",
+                            "Story Books",
+                            "--log-level",
+                            "debug",
+                            str(epub),
+                        ]
+                    )
+
+        self.assertEqual(code, 1)
+        self.assertEqual(stdout.getvalue(), "http://calibre.example.test/calibre-web/book/35\n")
+        self.assertIn("OK    Uploaded to Calibre-Web", stderr.getvalue())
+        self.assertIn("INFO  Book: http://calibre.example.test/calibre-web/book/35", stderr.getvalue())
+        self.assertIn("WARN  Calibre-Web did not expose shelf actions", stderr.getvalue())
