@@ -265,6 +265,7 @@ class CliTest(TestCase):
                 book_id=35,
                 book_url="http://calibre.example.test/calibre-web/book/35",
                 shelves_added=["Long Reads"],
+                shelves_present=["Quick Read"],
             )
 
             with patch("articlepub.cli.CalibreWebUploader") as uploader_cls:
@@ -285,9 +286,13 @@ class CliTest(TestCase):
 
         self.assertEqual(code, 0)
         self.assertEqual(stdout.getvalue(), "http://calibre.example.test/calibre-web/book/35\n")
-        self.assertIn("OK    Uploaded to Calibre-Web", stderr.getvalue())
+        self.assertIn("INFO  Login skipped (anonymous mode)", stderr.getvalue())
+        self.assertIn("OK    Book uploaded", stderr.getvalue())
         self.assertIn("INFO  Book: http://calibre.example.test/calibre-web/book/35", stderr.getvalue())
+        self.assertIn("INFO  Fetching shelves", stderr.getvalue())
         self.assertIn("OK    Added to shelf: Long Reads", stderr.getvalue())
+        self.assertIn("INFO  Already on shelf: Quick Read", stderr.getvalue())
+        self.assertIn("OK    Book uploaded successfully", stderr.getvalue())
         config = uploader_cls.call_args.args[0]
         self.assertEqual(config.shelf_names, ["Long Reads"])
 
@@ -302,7 +307,10 @@ class CliTest(TestCase):
                 location="/calibre-web/book/35",
                 book_id=35,
                 book_url="http://calibre.example.test/calibre-web/book/35",
-                shelf_errors=["Calibre-Web did not expose shelf actions for this book; shelf changes may require login"],
+                shelf_errors=[
+                    "Calibre-Web did not expose shelf actions for this book; "
+                    "confirm this user can see and edit the requested shelf"
+                ],
             )
 
             with patch("articlepub.cli.CalibreWebUploader") as uploader_cls:
@@ -323,6 +331,9 @@ class CliTest(TestCase):
 
         self.assertEqual(code, 1)
         self.assertEqual(stdout.getvalue(), "http://calibre.example.test/calibre-web/book/35\n")
-        self.assertIn("OK    Uploaded to Calibre-Web", stderr.getvalue())
+        self.assertIn("INFO  Login skipped (anonymous mode)", stderr.getvalue())
+        self.assertIn("OK    Book uploaded", stderr.getvalue())
         self.assertIn("INFO  Book: http://calibre.example.test/calibre-web/book/35", stderr.getvalue())
-        self.assertIn("WARN  Calibre-Web did not expose shelf actions", stderr.getvalue())
+        self.assertIn("INFO  Fetching shelves", stderr.getvalue())
+        self.assertIn("WARN  Shelf update failed: Calibre-Web did not expose shelf actions", stderr.getvalue())
+        self.assertIn("WARN  Book uploaded, but shelf update failed", stderr.getvalue())

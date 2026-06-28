@@ -75,17 +75,51 @@ def _add(args: argparse.Namespace, ui: TerminalUI) -> int:
 
 def _upload(args: argparse.Namespace, ui: TerminalUI) -> int:
     ui.banner()
-    with ui.spinner("Uploading EPUB", "Upload complete"):
-        result = CalibreWebUploader(_calibre_config(args)).upload_result(Path(args.epub))
-    ui.success("Uploaded to Calibre-Web")
-    if result.book_url:
-        ui.info(f"Book: {result.book_url}")
-    for shelf_name in result.shelves_added:
-        ui.success(f"Added to shelf: {shelf_name}")
-    for error in result.shelf_errors:
-        ui.warning(error)
+    config = _calibre_config(args)
+    progress_emitted = False
+
+    def progress(level: str, message: str) -> None:
+        nonlocal progress_emitted
+        progress_emitted = True
+        if level == "success":
+            ui.success(message)
+        elif level == "warning":
+            ui.warning(message)
+        else:
+            ui.info(message)
+
+    try:
+        result = CalibreWebUploader(config, log=ui.debug, progress=progress).upload_result(Path(args.epub))
+    except Exception as exc:
+        ui.error(f"Book upload failed: {exc}")
+        return 1
+
+    if not progress_emitted:
+        _report_upload_result(config, result, ui)
+    if result.shelf_errors:
+        ui.warning("Book uploaded, but shelf update failed")
+    else:
+        ui.success("Book uploaded successfully")
     print(result.book_url or result.location or "uploaded")
     return 1 if result.shelf_errors else 0
+
+
+def _report_upload_result(config: CalibreConfig, result, ui: TerminalUI) -> None:
+    if config.username and config.password:
+        ui.success("Login succeeded")
+    else:
+        ui.info("Login skipped (anonymous mode)")
+    ui.success("Book uploaded")
+    if result.book_url:
+        ui.info(f"Book: {result.book_url}")
+    if config.shelf_names:
+        ui.info("Fetching shelves")
+    for shelf_name in result.shelves_added:
+        ui.success(f"Added to shelf: {shelf_name}")
+    for shelf_name in result.shelves_present:
+        ui.info(f"Already on shelf: {shelf_name}")
+    for error in result.shelf_errors:
+        ui.warning(f"Shelf update failed: {error}")
 
 
 def _doctor(args: argparse.Namespace, ui: TerminalUI) -> int:

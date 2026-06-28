@@ -36,6 +36,21 @@ DETAIL_PAGE = """
 </ul>
 """
 
+DETAIL_PAGE_ALREADY_ON_SHELF = """
+<form id="have_read_form">
+  <input type="hidden" name="csrf_token" value="detail-csrf">
+</form>
+<ul id="add-to-shelves">
+  <li>
+    <a
+      data-href="/calibre-web/shelf/remove/8/35"
+      data-add-href="/calibre-web/shelf/add/8/35"
+      data-shelf-action="remove"
+    >Quick Read</a>
+  </li>
+</ul>
+"""
+
 
 class FakeUploadResponse:
     def __init__(self, status: int = 200, body: str = "ok", url: str | None = None) -> None:
@@ -196,6 +211,74 @@ class UploadTest(TestCase):
         self.assertEqual(opener.requests[3].full_url, "http://calibre.example.test/calibre-web/shelf/add/7/35")
         self.assertEqual(opener.requests[3].data, b"csrf_token=detail-csrf")
 
+    def test_upload_result_emits_progress_story_for_login_upload_and_shelf(self) -> None:
+        events = []
+        with TemporaryDirectory() as tmp:
+            path = Path(tmp) / "book.epub"
+            path.write_bytes(b"epub")
+            uploader = CalibreWebUploader(
+                CalibreConfig(
+                    base_url="http://calibre.example.test/calibre-web/",
+                    username="user",
+                    password="pass",
+                    shelf_names=["Long Reads"],
+                ),
+                progress=lambda level, message: events.append((level, message)),
+            )
+            opener = FakeOpener(
+                [
+                    FakeUploadResponse(body=LOGIN_FORM, url="http://calibre.example.test/calibre-web/login"),
+                    FakeUploadResponse(body="logged in", url="http://calibre.example.test/calibre-web/"),
+                    FakeUploadResponse(body=UPLOAD_FORM, url="http://calibre.example.test/calibre-web/"),
+                    FakeUploadResponse(body='{"location": "/calibre-web/book/35"}',
+                                       url="http://calibre.example.test/calibre-web/upload"),
+                    FakeUploadResponse(body=DETAIL_PAGE, url="http://calibre.example.test/calibre-web/book/35"),
+                    FakeUploadResponse(status=204, body="", url="http://calibre.example.test/calibre-web/shelf/add/7/35"),
+                ]
+            )
+            uploader.opener = opener
+
+            uploader.upload_result(path)
+
+        self.assertEqual(
+            events,
+            [
+                ("success", "Login succeeded"),
+                ("success", "Book uploaded"),
+                ("info", "Book: http://calibre.example.test/calibre-web/book/35"),
+                ("info", "Fetching shelves"),
+                ("success", "Added to shelf: Long Reads"),
+            ],
+        )
+
+    def test_upload_result_reports_requested_shelf_already_present(self) -> None:
+        with TemporaryDirectory() as tmp:
+            path = Path(tmp) / "book.epub"
+            path.write_bytes(b"epub")
+            uploader = CalibreWebUploader(
+                CalibreConfig(base_url="http://calibre.example.test/calibre-web/", shelf_names=["Quick Read"])
+            )
+            opener = FakeOpener(
+                [
+                    FakeUploadResponse(body=UPLOAD_FORM, url="http://calibre.example.test/calibre-web/"),
+                    FakeUploadResponse(body='{"location": "/calibre-web/book/35"}',
+                                       url="http://calibre.example.test/calibre-web/upload"),
+                    FakeUploadResponse(
+                        body=DETAIL_PAGE_ALREADY_ON_SHELF,
+                        url="http://calibre.example.test/calibre-web/book/35",
+                    ),
+                ]
+            )
+            uploader.opener = opener
+
+            result = uploader.upload_result(path)
+
+        self.assertEqual(result.book_url, "http://calibre.example.test/calibre-web/book/35")
+        self.assertEqual(result.shelves_added, [])
+        self.assertEqual(result.shelves_present, ["Quick Read"])
+        self.assertEqual(result.shelf_errors, [])
+        self.assertEqual(len(opener.requests), 3)
+
     def test_shelf_failure_keeps_successful_upload_result(self) -> None:
         with TemporaryDirectory() as tmp:
             path = Path(tmp) / "book.epub"
@@ -220,5 +303,32 @@ class UploadTest(TestCase):
         self.assertEqual(result.shelves_added, [])
         self.assertEqual(
             result.shelf_errors,
-            ["Calibre-Web did not expose shelf actions for this book; shelf changes may require login"],
+            [
+                "Calibre-Web did not expose shelf actions for this book; "
+                "shelf changes require login or shelf permissions"
+            ],
         )
+
+    def test_credentialed_login_fails_when_login_form_is_returned(self) -> None:
+        with TemporaryDirectory() as tmp:
+            path = Path(tmp) / "book.epub"
+            path.write_bytes(b"epub")
+            uploader = CalibreWebUploader(
+                CalibreConfig(
+                    base_url="http://calibre.example.test/calibre-web/",
+                    username="user",
+                    password="pass",
+                )
+            )
+            opener = FakeOpener(
+                [
+                    FakeUploadResponse(body=LOGIN_FORM, url="http://calibre.example.test/calibre-web/login"),
+                    FakeUploadResponse(body=LOGIN_FORM, url="http://calibre.example.test/calibre-web/login"),
+                ]
+            )
+            uploader.opener = opener
+
+            with self.assertRaisesRegex(UploadError, "login did not complete"):
+                uploader.upload_result(path)
+
+        self.assertEqual(len(opener.requests), 2)
