@@ -43,43 +43,29 @@ python -m articlepub doctor https://www.rafikfarhad.me/ --doctor-timeout 10
 
 ## CLI Reference
 
-`add` converts a URL to EPUB. `doctor` validates the same conversion flags without building an EPUB.
+`add` converts a URL to EPUB. `doctor` validates the same conversion flags without building an EPUB. `upload` sends an existing EPUB to Calibre-Web. Positional arguments are not listed here: `add` and `doctor` require a URL, and `upload` requires an EPUB path.
 
-| Command | Argument or flag | Required | Default | Notes |
-| --- | --- | --- | --- | --- |
-| `add`, `doctor` | `url` | Yes | None | Article URL to convert or validate. |
-| `add`, `doctor` | `--out` | No | `dist` | Output directory for EPUB and optional `.raw` metadata. |
-| `add`, `doctor` | `--fetch-mode` | No | `auto` | Choices: `auto`, `local`, `llm`. |
-| `add`, `doctor` | `--provider` | No | `anthropic` | Choices: `anthropic`, `none`. |
-| `add`, `doctor` | `--api-key` | Conditional | `ANTHROPIC_API_KEY` env var, otherwise none | Required when `--provider anthropic` and `ANTHROPIC_API_KEY` is not set. |
-| `add`, `doctor` | `--model` | No | `claude-sonnet-4-6` | Anthropic model name. |
-| `add`, `doctor` | `--web-fetch-tool` | No | `web_fetch_20260318` | Anthropic server-tool version used by `--fetch-mode llm`. |
-| `add`, `doctor` | `--llm-timeout` | No | `300` | Anthropic read timeout in seconds. |
-| `add`, `doctor` | `--llm-retries` | No | `2` | Retry count for retryable Anthropic failures. |
-| `add`, `doctor` | `--llm-max-tokens` | No | `8192` | Maximum Anthropic output tokens. |
-| `add`, `doctor` | `--doctor-timeout` | No | `10` | Live doctor API check timeout in seconds. |
-| `add`, `doctor` | `--strict` | No | `false` | Enables sentence-preservation validation when local source text is available. |
-| `add`, `doctor` | `--title` | No | None | Overrides the EPUB title after extraction/refinement. |
-| `add`, `doctor` | `--store-metadata` | No | `false` | Stores raw debug artifacts under `OUT/.raw`; without it, stale `.raw` data is removed. |
-| `add`, `doctor` | `--log-level` | No | `info` | Choices: `quiet`, `error`, `warning`, `info`, `debug`. |
-| `add`, `doctor` | `--calibre-url` | No | None | Calibre-Web base URL. Use `http://calibre.example.test/calibre-web/` for a path-mounted server. |
-| `add`, `doctor` | `--calibre-username` | Conditional | None | Optional for anonymous upload; must be paired with `--calibre-password` when used. |
-| `add`, `doctor` | `--calibre-password` | Conditional | None | Optional for anonymous upload; must be paired with `--calibre-username` when used. |
-| `add`, `doctor` | `--calibre-api-key` | No | None | Optional Calibre-Web API token header. |
-| `add` | `--doctor` | No | `false` | Validates flags/config and exits instead of building. |
-
-`upload` sends an existing EPUB to Calibre-Web.
-
-| Command | Argument or flag | Required | Default | Notes |
-| --- | --- | --- | --- | --- |
-| `upload` | `epub` | Yes | None | Path to an existing `.epub` file. |
-| `upload` | `--calibre-url` | Yes | None | Calibre-Web base URL. |
-| `upload` | `--calibre-username` | Conditional | None | Optional for anonymous upload; must be paired with `--calibre-password` when used. |
-| `upload` | `--calibre-password` | Conditional | None | Optional for anonymous upload; must be paired with `--calibre-username` when used. |
-| `upload` | `--calibre-api-key` | No | None | Optional Calibre-Web API token header. |
-| `upload` | `--log-level` | No | `info` | Choices: `quiet`, `error`, `warning`, `info`, `debug`. |
-
-`tui` has no flags.
+| Flag | Required | Default | Notes |
+| --- | --- | --- | --- |
+| `--out` | No | `dist` | Output directory for EPUB and optional `.raw` metadata. |
+| `--fetch-mode` | No | `auto` | Choices: `auto`, `local`, `llm`. |
+| `--provider` | No | `anthropic` | Choices: `anthropic`, `none`. |
+| `--api-key` | Conditional | `ANTHROPIC_API_KEY` env var, otherwise none | Required when using `--provider anthropic` and `ANTHROPIC_API_KEY` is not set. |
+| `--model` | No | `claude-sonnet-4-6` | Anthropic model name. |
+| `--web-fetch-tool` | No | `web_fetch_20260318` | Anthropic server-tool version used by `--fetch-mode llm`. |
+| `--llm-timeout` | No | `300` | Anthropic read timeout in seconds. |
+| `--llm-retries` | No | `2` | Retry count for retryable Anthropic failures. |
+| `--llm-max-tokens` | No | `8192` | Maximum Anthropic output tokens. |
+| `--doctor-timeout` | No | `10` | Live doctor API check timeout in seconds. |
+| `--strict` | No | `false` | Enables sentence-preservation validation when local source text is available. |
+| `--title` | No | None | Overrides the EPUB title after extraction/refinement. |
+| `--store-metadata` | No | `false` | Stores raw debug artifacts under `OUT/.raw`; without it, stale `.raw` data is removed. |
+| `--log-level` | No | `info` | Choices: `quiet`, `error`, `warning`, `info`, `debug`. |
+| `--calibre-url` | Required for `upload`; optional for `add` | None | Calibre-Web base URL. Use `http://calibre.example.test/calibre-web/` for a path-mounted server. |
+| `--calibre-username` | Conditional | None | Optional for anonymous upload; must be paired with `--calibre-password` when used. |
+| `--calibre-password` | Conditional | None | Optional for anonymous upload; must be paired with `--calibre-username` when used. |
+| `--calibre-api-key` | No | None | Optional Calibre-Web API token header. |
+| `--doctor` | No | `false` | `add` only. Validates flags/config and exits instead of building. |
 
 ## Fetch Modes
 
