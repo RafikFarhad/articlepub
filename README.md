@@ -1,91 +1,174 @@
 # ArticlePub
 
-`articlepub` turns a blog/article URL into a Kindle-friendly EPUB and can upload it to Calibre-Web.
+Turn a long article or blog post into a clean, Kindle-friendly EPUB.
 
-## Examples
+ArticlePub is for the moment when you find something worth reading, but you want it in your reading queue instead of another browser tab. Give it a URL, get an EPUB, and optionally send that EPUB straight to Calibre-Web.
 
-```bash
-python -m articlepub add https://www.rafikfarhad.me/ --out dist
-python -m articlepub add https://www.rafikfarhad.me/ --provider anthropic --api-key "$ANTHROPIC_API_KEY"
-python -m articlepub add https://www.rafikfarhad.me/ --fetch-mode llm --provider anthropic --api-key "$ANTHROPIC_API_KEY"
-python -m articlepub add https://www.rafikfarhad.me/ --calibre-url https://calibre.example.com --calibre-username user --calibre-password pass
-python -m articlepub upload --calibre-url https://calibre.example.com --calibre-shelf "Long Reads" dist/article.epub
-python -m articlepub tui
-```
+## Quick Start
 
-In an interactive terminal, the CLI shows a colored banner, spinner animation, and ASCII status faces. When stdout/stderr are redirected, it keeps output plain for scripting.
-
-Use `--log-level debug` to see each timed pipeline step as it runs. The final status report includes total runtime, per-step timing, and LLM token usage when the provider returns it.
+If you have `uv`, you can run ArticlePub without installing it permanently:
 
 ```bash
-python -m articlepub add https://www.rafikfarhad.me/ --log-level debug
+uvx articlepub add "https://example.com/article" --provider none
 ```
 
-For slower LLM web fetches, increase the Anthropic timeout or retries:
+That creates an EPUB in `dist/`.
+
+Want AI cleanup and better article structure? Set your Anthropic key and leave the provider at its default:
 
 ```bash
-python -m articlepub add https://www.rafikfarhad.me/ --llm-timeout 600 --llm-retries 3
+export ANTHROPIC_API_KEY="..."
+uvx articlepub add "https://example.com/article"
 ```
 
-Store raw run artifacts for debugging:
+Trying ArticlePub before it is available from your Python package index? Run it directly from GitHub:
 
 ```bash
-python -m articlepub add https://www.rafikfarhad.me/ --store-metadata
+uvx --from git+https://github.com/RafikFarhad/articlepub.git articlepub add "https://example.com/article" --provider none
 ```
 
-This recreates `OUT/.raw` for each run. Without `--store-metadata`, stale `OUT/.raw` data is deleted.
+## Send To Calibre-Web
 
-Run doctor before a long job to validate the URL, output directory, flag combinations, Calibre config, and Anthropic key/model with a short API call:
+If your Calibre-Web server allows anonymous uploads:
 
 ```bash
-python -m articlepub add https://www.rafikfarhad.me/ --doctor
-python -m articlepub doctor https://www.rafikfarhad.me/ --doctor-timeout 10
+uvx articlepub add "https://example.com/article" \
+  --provider none \
+  --calibre-url "https://calibre.example.com/"
 ```
 
-## CLI Reference
+If login is required:
 
-`add` converts a URL to EPUB. `doctor` validates the same conversion flags without building an EPUB. `upload` sends an existing EPUB to Calibre-Web. Positional arguments are not listed here: `add` and `doctor` require a URL, and `upload` requires an EPUB path.
+```bash
+uvx articlepub add "https://example.com/article" \
+  --calibre-url "https://calibre.example.com/" \
+  --calibre-username "articlepub" \
+  --calibre-password "your-password"
+```
 
-| Flag | Required | Default | Notes |
-| --- | --- | --- | --- |
-| `--out` | No | `dist` | Output directory for EPUB and optional `.raw` metadata. |
-| `--fetch-mode` | No | `auto` | Choices: `auto`, `local`, `llm`. |
-| `--provider` | No | `anthropic` | Choices: `anthropic`, `none`. |
-| `--api-key` | Conditional | `ANTHROPIC_API_KEY` env var, otherwise none | Required when using `--provider anthropic` and `ANTHROPIC_API_KEY` is not set. |
-| `--model` | No | `claude-sonnet-4-6` | Anthropic model name. |
-| `--web-fetch-tool` | No | `web_fetch_20260318` | Anthropic server-tool version used by `--fetch-mode llm`. |
-| `--llm-timeout` | No | `300` | Anthropic read timeout in seconds. |
-| `--llm-retries` | No | `2` | Retry count for retryable Anthropic failures. |
-| `--llm-max-tokens` | No | `8192` | Maximum Anthropic output tokens. |
-| `--doctor-timeout` | No | `10` | Live doctor API check timeout in seconds. |
-| `--strict` | No | `false` | Enables sentence-preservation validation when local source text is available. |
-| `--title` | No | None | Overrides the EPUB title after extraction/refinement. |
-| `--store-metadata` | No | `false` | Stores raw debug artifacts under `OUT/.raw`; without it, stale `.raw` data is removed. |
-| `--log-level` | No | `info` | Choices: `quiet`, `error`, `warning`, `info`, `debug`. |
-| `--calibre-url` | Required for `upload`; optional for `add` | None | Calibre-Web base URL. Use `http://calibre.example.test/calibre-web/` for a path-mounted server. |
-| `--calibre-username` | Conditional | None | Optional for anonymous upload; must be paired with `--calibre-password` when used. |
-| `--calibre-password` | Conditional | None | Optional for anonymous upload; must be paired with `--calibre-username` when used. |
-| `--calibre-api-key` | No | None | Optional Calibre-Web API token header. |
-| `--calibre-shelf` | No | None | Add the uploaded book to a Calibre-Web shelf by name. Repeat for multiple shelves; quote names containing spaces. |
-| `--doctor` | No | `false` | `add` only. Validates flags/config and exits instead of building. |
+Add the uploaded book to a shelf:
+
+```bash
+uvx articlepub add "https://example.com/article" \
+  --calibre-url "https://calibre.example.com/" \
+  --calibre-shelf "Quick Read"
+```
+
+Shelf names can contain spaces. Repeat `--calibre-shelf` to add the book to more than one shelf.
+
+Already have an EPUB? Upload it directly:
+
+```bash
+uvx articlepub upload \
+  --calibre-url "https://calibre.example.com/" \
+  --calibre-shelf "Quick Read" \
+  dist/article.epub
+```
+
+## What You Get
+
+ArticlePub prints the EPUB path to stdout, so it is easy to script:
+
+```text
+dist/example-article.epub
+```
+
+When Calibre-Web upload is enabled, it also prints the Calibre-Web book URL when available:
+
+```text
+dist/example-article.epub
+https://calibre.example.com/book/35
+```
+
+Status messages go to stderr and tell the story of the run:
+
+```text
+OK    Saved dist/example-article.epub  :-)
+OK    Book uploaded  :-)
+INFO  Book: https://calibre.example.com/book/35
+OK    Added to shelf: Quick Read  :-)
+OK    Book uploaded successfully  :-)
+```
+
+## Common Recipes
+
+Save to a different folder:
+
+```bash
+uvx articlepub add "https://example.com/article" --provider none --out ~/Documents/epubs
+```
+
+Override the EPUB title:
+
+```bash
+uvx articlepub add "https://example.com/article" --provider none --title "Weekend Reading"
+```
+
+Use Claude to fetch the page directly when local extraction fails. This requires `ANTHROPIC_API_KEY` or `--api-key`:
+
+```bash
+uvx articlepub add "https://example.com/article" --fetch-mode llm
+```
+
+Check your setup before a long run:
+
+```bash
+uvx articlepub doctor "https://example.com/article" --provider none
+```
+
+See detailed timing and upload diagnostics:
+
+```bash
+uvx articlepub add "https://example.com/article" --provider none --log-level debug
+```
+
+Keep raw debug artifacts for one run:
+
+```bash
+uvx articlepub add "https://example.com/article" --provider none --store-metadata
+```
+
+Raw artifacts are written under `OUT/.raw`. Without `--store-metadata`, stale `.raw` data is removed.
 
 ## Fetch Modes
 
-- `local`: fetches the URL locally, extracts the main article, then optionally asks the LLM to clean the article HTML.
-- `llm`: does not fetch locally; asks the LLM provider to fetch the exact URL with its web-fetch tool.
-- `auto`: tries local first and falls back to LLM fetch when local fetch/extraction fails.
+ArticlePub starts with `--fetch-mode auto`.
 
-## Anthropic
+- `auto`: try local extraction first, then fall back to LLM fetch when needed.
+- `local`: fetch and extract locally, then optionally ask the provider to clean the HTML.
+- `llm`: ask the LLM provider to fetch the URL directly.
 
-Anthropic support uses the Messages API directly. For `--fetch-mode llm`, it enables Claude's `web_fetch` server tool and restricts the request to the domain of the URL you passed.
+If you do not want to use an LLM, add `--provider none`.
 
-The API key can be passed with `--api-key` or `ANTHROPIC_API_KEY`.
+## Useful Options
 
-## Prompts
+| Option | What it does |
+| --- | --- |
+| `--out dist` | Choose where EPUB files are written. |
+| `--provider none` | Build without an LLM or API key. |
+| `--api-key ...` | Pass an Anthropic key directly instead of using `ANTHROPIC_API_KEY`. |
+| `--title "..."` | Override the EPUB title. |
+| `--log-level debug` | Show detailed timing and Calibre-Web steps. |
+| `--doctor` | Validate an `add` command without building the EPUB. |
+| `--calibre-url ...` | Upload the result to Calibre-Web. |
+| `--calibre-username ...` and `--calibre-password ...` | Log in before uploading. |
+| `--calibre-shelf "Quick Read"` | Add the uploaded book to a shelf. |
 
-LLM prompts live in `src/articlepub/prompts.py`.
+Run `uvx articlepub --help` or `uvx articlepub add --help` for the full CLI reference.
 
-## Tests
+## Local Development
+
+From a checkout of this repository:
+
+```bash
+PYTHONPATH=src python -m articlepub add "file://$PWD/tests/fixtures/blog.html" \
+  --provider none \
+  --fetch-mode local \
+  --out /private/tmp/articlepub-check \
+  --log-level debug
+```
+
+Run the test suite:
 
 ```bash
 PYTHONPATH=src python -m unittest discover -s tests
