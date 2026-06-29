@@ -5,6 +5,7 @@ from tempfile import TemporaryDirectory
 from unittest import TestCase
 from unittest.mock import patch
 
+from articlepub import __version__
 from articlepub.cli import main
 from articlepub.upload import UploadResult
 
@@ -13,6 +14,22 @@ FIXTURE = Path(__file__).parent / "fixtures" / "blog.html"
 
 
 class CliTest(TestCase):
+    def test_global_version_flag_prints_version(self) -> None:
+        stdout = io.StringIO()
+        with redirect_stdout(stdout), self.assertRaises(SystemExit) as exit_context:
+            main(["--version"])
+
+        self.assertEqual(exit_context.exception.code, 0)
+        self.assertEqual(stdout.getvalue(), f"{__version__}\n")
+
+    def test_version_command_prints_version(self) -> None:
+        stdout = io.StringIO()
+        with redirect_stdout(stdout):
+            code = main(["version"])
+
+        self.assertEqual(code, 0)
+        self.assertEqual(stdout.getvalue(), f"{__version__}\n")
+
     def test_add_local_file_without_provider(self) -> None:
         with TemporaryDirectory() as tmp:
             stdout = io.StringIO()

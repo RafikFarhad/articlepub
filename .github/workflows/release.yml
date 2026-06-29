@@ -7,6 +7,7 @@ on:
 
 permissions:
   contents: write
+  id-token: write
 
 concurrency:
   group: release-${{ github.ref }}
@@ -16,6 +17,7 @@ jobs:
   release:
     name: Build, publish, and release
     runs-on: ubuntu-latest
+    environment: release
 
     steps:
       - name: Check out repository
@@ -72,9 +74,7 @@ jobs:
         run: uvx --from "dist/articlepub-${{ steps.version.outputs.version }}-py3-none-any.whl" articlepub --help
 
       - name: Publish to PyPI
-        env:
-          UV_PUBLISH_TOKEN: ${{ secrets.ARTICLEPUB_PYPI_UPLOAD_TOKEN }}
-        run: uv publish dist/* --check-url https://pypi.org/simple/articlepub/
+        run: uv publish dist/* --trusted-publishing always --check-url https://pypi.org/simple/articlepub/
 
       - name: Create GitHub release
         env:

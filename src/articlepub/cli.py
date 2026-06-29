@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
+from . import __version__
 from .cli_support import make_provider
 from .cli_ui import TerminalUI
 from .constants import DEFAULT_OUTPUT_DIR
@@ -30,6 +31,9 @@ def main(argv: list[str] | None = None) -> int:
             return _upload(args, ui)
         if args.command == "tui":
             return run_tui(ui)
+        if args.command == "version":
+            print(__version__)
+            return 0
         parser.print_help()
         return 2
     except Exception as exc:
@@ -194,6 +198,7 @@ def _calibre_config(args: argparse.Namespace) -> CalibreConfig:
 
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="articlepub")
+    parser.add_argument("--version", action="version", version=__version__)
     sub = parser.add_subparsers(dest="command")
 
     add = sub.add_parser("add", help="Convert a URL to EPUB")
@@ -209,6 +214,7 @@ def _parser() -> argparse.ArgumentParser:
     _add_calibre_args(upload, require_url=True)
 
     sub.add_parser("tui", help="Run the interactive terminal UI")
+    sub.add_parser("version", help="Print the ArticlePub version")
     return parser
 
 

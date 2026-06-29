@@ -150,6 +150,13 @@ If you do not want to use an LLM, add `--provider none`.
 
 Run `uvx articlepub --help` or `uvx articlepub add --help` for the full CLI reference.
 
+Check the installed version:
+
+```bash
+uvx articlepub --version
+uvx articlepub version
+```
+
 ## Local Development
 
 From a checkout of this repository:
@@ -180,9 +187,9 @@ Before tagging, update the version in both places:
 Then commit, tag, and push:
 
 ```bash
-git tag v0.1.1
+git tag v0.1.2
 git push origin main
-git push origin v0.1.1
+git push origin v0.1.2
 ```
 
-The GitHub Action will run tests, build the wheel and source distribution, publish to PyPI using `secrets.ARTICLEPUB_PYPI_UPLOAD_TOKEN`, and create a GitHub Release with generated release notes.
+The GitHub Action will run tests, build the wheel and source distribution, publish to PyPI with Trusted Publishing, and create a GitHub Release with generated release notes. The PyPI trusted publisher should point at the `release` GitHub Actions environment.

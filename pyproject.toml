@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "articlepub"
-version = "0.1.1"
+version = "0.1.2"
 description = "Turn article URLs into Kindle-friendly EPUBs and optionally upload them to Calibre-Web."
 readme = "README.md"
 requires-python = ">=3.11"
