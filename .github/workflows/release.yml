@@ -1,0 +1,88 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Build, publish, and release
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install uv
+        run: python -m pip install --upgrade uv
+
+      - name: Validate release tag
+        id: version
+        env:
+          TAG_NAME: ${{ github.ref_name }}
+        run: |
+          python - <<'PY'
+          import os
+          import re
+          import tomllib
+          from pathlib import Path
+
+          tag = os.environ["TAG_NAME"]
+          if not re.fullmatch(r"v\d+\.\d+\.\d+", tag):
+              raise SystemExit(f"Release tag must look like v1.2.3: {tag}")
+
+          version = tag[1:]
+          project = tomllib.loads(Path("pyproject.toml").read_text(encoding="utf-8"))
+          pyproject_version = project["project"]["version"]
+          init_text = Path("src/articlepub/__init__.py").read_text(encoding="utf-8")
+          init_match = re.search(r'__version__\s*=\s*"([^"]+)"', init_text)
+          init_version = init_match.group(1) if init_match else None
+
+          if pyproject_version != version:
+              raise SystemExit(f"pyproject.toml version {pyproject_version} does not match tag {tag}")
+          if init_version != version:
+              raise SystemExit(f"src/articlepub/__init__.py version {init_version} does not match tag {tag}")
+
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
+              output.write(f"version={version}\n")
+          PY
+
+      - name: Run tests
+        run: PYTHONPATH=src uv run --python 3.11 python -m unittest discover -s tests
+
+      - name: Build distributions
+        run: uv build --out-dir dist --clear
+
+      - name: Smoke test wheel entry point
+        run: uvx --from "dist/articlepub-${{ steps.version.outputs.version }}-py3-none-any.whl" articlepub --help
+
+      - name: Publish to PyPI
+        env:
+          UV_PUBLISH_TOKEN: ${{ secrets.ARTICLEPUB_PYPI_UPLOAD_TOKEN }}
+        run: uv publish dist/* --check-url https://pypi.org/simple/articlepub/
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG_NAME: ${{ github.ref_name }}
+        run: |
+          if gh release view "$TAG_NAME" >/dev/null 2>&1; then
+            gh release upload "$TAG_NAME" dist/* --clobber
+          else
+            gh release create "$TAG_NAME" dist/* --verify-tag --title "$TAG_NAME" --generate-notes
+          fi

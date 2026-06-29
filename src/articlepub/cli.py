@@ -5,6 +5,7 @@ from pathlib import Path
 
 from .cli_support import make_provider
 from .cli_ui import TerminalUI
+from .constants import DEFAULT_OUTPUT_DIR
 from .diagnostics import DoctorOptions, run_doctor
 from .models import CalibreConfig
 from .pipeline import BuildOptions, build
@@ -213,7 +214,7 @@ def _parser() -> argparse.ArgumentParser:
 
 def _add_conversion_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("url")
-    parser.add_argument("--out", default="dist")
+    parser.add_argument("--out", default=DEFAULT_OUTPUT_DIR)
     parser.add_argument("--fetch-mode", choices=["auto", "local", "llm"], default="auto")
     parser.add_argument("--provider", choices=["none", "anthropic"], default="anthropic")
     parser.add_argument("--api-key")

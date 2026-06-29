@@ -4,6 +4,7 @@ from pathlib import Path
 
 from .cli_support import make_provider
 from .cli_ui import TerminalUI
+from .constants import DEFAULT_OUTPUT_DIR
 from .models import CalibreConfig
 from .pipeline import BuildOptions, build
 
@@ -21,7 +22,7 @@ def run_tui(ui: TerminalUI | None = None) -> int:
     fetch_mode = _choice("Fetch mode", ["auto", "local", "llm"], "auto")
     provider_name = _choice("Provider", ["none", "anthropic"], "anthropic")
     api_key = input("API key (blank uses env/provider default): ").strip() or None
-    output_dir = Path(input("Output directory [dist]: ").strip() or "dist")
+    output_dir = Path(input(f"Output directory [{DEFAULT_OUTPUT_DIR}]: ").strip() or DEFAULT_OUTPUT_DIR)
     calibre_url = input("Calibre-Web URL (blank to skip upload): ").strip() or None
     calibre = None
     if calibre_url:

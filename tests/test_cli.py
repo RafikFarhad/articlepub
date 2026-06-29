@@ -1,5 +1,5 @@
 import io
-from contextlib import redirect_stderr, redirect_stdout
+from contextlib import chdir, redirect_stderr, redirect_stdout
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest import TestCase
@@ -23,6 +23,18 @@ class CliTest(TestCase):
             epub_path = Path(stdout.getvalue().strip())
             self.assertTrue(epub_path.exists())
             self.assertEqual(epub_path.parent, Path(tmp))
+
+    def test_add_uses_articlepub_default_output_directory(self) -> None:
+        with TemporaryDirectory() as tmp, chdir(tmp):
+            stdout = io.StringIO()
+            with redirect_stdout(stdout):
+                code = main(["add", FIXTURE.as_uri(), "--provider", "none", "--fetch-mode", "local"])
+
+            epub_path = Path(stdout.getvalue().strip())
+
+        self.assertEqual(code, 0)
+        self.assertEqual(epub_path.parent, Path("articlepub"))
+        self.assertEqual(epub_path.name, "example-blog-post.epub")
 
     def test_debug_log_level_reports_steps_to_stderr(self) -> None:
         with TemporaryDirectory() as tmp:

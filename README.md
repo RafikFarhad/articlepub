@@ -12,19 +12,13 @@ If you have `uv`, you can run ArticlePub without installing it permanently:
 uvx articlepub add "https://example.com/article" --provider none
 ```
 
-That creates an EPUB in `dist/`.
+That creates an EPUB in `articlepub/`.
 
 Want AI cleanup and better article structure? Set your Anthropic key and leave the provider at its default:
 
 ```bash
 export ANTHROPIC_API_KEY="..."
 uvx articlepub add "https://example.com/article"
-```
-
-Trying ArticlePub before it is available from your Python package index? Run it directly from GitHub:
-
-```bash
-uvx --from git+https://github.com/RafikFarhad/articlepub.git articlepub add "https://example.com/article" --provider none
 ```
 
 ## Send To Calibre-Web
@@ -62,7 +56,7 @@ Already have an EPUB? Upload it directly:
 uvx articlepub upload \
   --calibre-url "https://calibre.example.com/" \
   --calibre-shelf "Quick Read" \
-  dist/article.epub
+  articlepub/article.epub
 ```
 
 ## What You Get
@@ -70,20 +64,20 @@ uvx articlepub upload \
 ArticlePub prints the EPUB path to stdout, so it is easy to script:
 
 ```text
-dist/example-article.epub
+articlepub/example-article.epub
 ```
 
 When Calibre-Web upload is enabled, it also prints the Calibre-Web book URL when available:
 
 ```text
-dist/example-article.epub
+articlepub/example-article.epub
 https://calibre.example.com/book/35
 ```
 
 Status messages go to stderr and tell the story of the run:
 
 ```text
-OK    Saved dist/example-article.epub  :-)
+OK    Saved articlepub/example-article.epub  :-)
 OK    Book uploaded  :-)
 INFO  Book: https://calibre.example.com/book/35
 OK    Added to shelf: Quick Read  :-)
@@ -144,7 +138,7 @@ If you do not want to use an LLM, add `--provider none`.
 
 | Option | What it does |
 | --- | --- |
-| `--out dist` | Choose where EPUB files are written. |
+| `--out articlepub` | Choose where EPUB files are written. |
 | `--provider none` | Build without an LLM or API key. |
 | `--api-key ...` | Pass an Anthropic key directly instead of using `ANTHROPIC_API_KEY`. |
 | `--title "..."` | Override the EPUB title. |
@@ -173,3 +167,22 @@ Run the test suite:
 ```bash
 PYTHONPATH=src python -m unittest discover -s tests
 ```
+
+## Release
+
+Releases are tag-driven. The release workflow runs when a `vX.Y.Z` tag is pushed.
+
+Before tagging, update the version in both places:
+
+- `pyproject.toml`
+- `src/articlepub/__init__.py`
+
+Then commit, tag, and push:
+
+```bash
+git tag v0.1.1
+git push origin main
+git push origin v0.1.1
+```
+
+The GitHub Action will run tests, build the wheel and source distribution, publish to PyPI using `secrets.ARTICLEPUB_PYPI_UPLOAD_TOKEN`, and create a GitHub Release with generated release notes.

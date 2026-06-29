@@ -31,7 +31,7 @@ PYTHONPATH=src python -m articlepub add "https://www.rafikfarhad.me/" --provider
 ## Current CLI Behavior
 
 - Main command: `articlepub add URL`.
-- Default output directory: `dist`.
+- Default output directory: `articlepub`.
 - Default fetch mode: `auto`.
 - Default provider: `anthropic`.
 - API key source: `--api-key` or `ANTHROPIC_API_KEY`.
