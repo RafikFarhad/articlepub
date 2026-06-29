@@ -12,7 +12,7 @@ from .raw_store import RawStore
 from .sanitize import sanitize_article_html
 from .stats import BuildStats, LogFn
 from .text import assert_sentences_preserved, html_to_text
-from .upload import CalibreWebUploader
+from .upload import CalibreWebUploader, ProgressLog
 
 
 @dataclass(slots=True)
@@ -27,6 +27,7 @@ class BuildOptions:
     calibre: CalibreConfig | None = None
     stats: BuildStats | None = None
     log: LogFn | None = None
+    upload_progress: ProgressLog | None = None
     store_metadata: bool = False
 
 
@@ -88,9 +89,14 @@ def build(options: BuildOptions) -> BuildResult:
         result = BuildResult(article=article, epub_path=epub_path, stats=stats)
         if options.calibre:
             with stats.step("upload to calibre-web", options.calibre.base_url, log=options.log):
-                response = CalibreWebUploader(options.calibre).upload(epub_path)
+                upload_result = CalibreWebUploader(
+                    options.calibre,
+                    log=options.log,
+                    progress=options.upload_progress,
+                ).upload_result(epub_path)
             result.uploaded = True
-            result.upload_response = response
+            result.upload_response = upload_result.response_text
+            result.upload_result = upload_result
         return result
     finally:
         stats.finish()

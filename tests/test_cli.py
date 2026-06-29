@@ -52,6 +52,52 @@ class CliTest(TestCase):
             self.assertIn("Step timing", status)
             self.assertIn("LLM usage", status)
 
+    def test_add_reports_same_calibre_upload_story_as_upload_command(self) -> None:
+        upload_result = UploadResult(
+            response_text='{"location": "/calibre-web/book/35"}',
+            location="/calibre-web/book/35",
+            book_id=35,
+            book_url="http://calibre.example.test/calibre-web/book/35",
+            shelves_added=["Quick Read"],
+        )
+        with TemporaryDirectory() as tmp:
+            stdout = io.StringIO()
+            stderr = io.StringIO()
+            with patch("articlepub.pipeline.CalibreWebUploader") as uploader_cls:
+                uploader_cls.return_value.upload_result.return_value = upload_result
+                with redirect_stdout(stdout), redirect_stderr(stderr):
+                    code = main(
+                        [
+                            "add",
+                            FIXTURE.as_uri(),
+                            "--provider",
+                            "none",
+                            "--fetch-mode",
+                            "local",
+                            "--out",
+                            tmp,
+                            "--calibre-url",
+                            "http://calibre.example.test/calibre-web/",
+                            "--calibre-shelf",
+                            "Quick Read",
+                            "--log-level",
+                            "debug",
+                        ]
+                    )
+
+        self.assertEqual(code, 0)
+        output_lines = stdout.getvalue().splitlines()
+        self.assertEqual(len(output_lines), 2)
+        self.assertEqual(Path(output_lines[0]).name, "example-blog-post.epub")
+        self.assertEqual(output_lines[1], "http://calibre.example.test/calibre-web/book/35")
+        status = stderr.getvalue()
+        self.assertIn("OK    Book uploaded", status)
+        self.assertIn("INFO  Book: http://calibre.example.test/calibre-web/book/35", status)
+        self.assertIn("INFO  Fetching shelves", status)
+        self.assertIn("OK    Added to shelf: Quick Read", status)
+        self.assertIn("OK    Book uploaded successfully", status)
+        self.assertNotIn("Uploaded to Calibre-Web", status)
+
     def test_add_doctor_with_provider_none_checks_flags_without_building(self) -> None:
         with TemporaryDirectory() as tmp:
             stdout = io.StringIO()

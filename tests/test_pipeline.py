@@ -1,14 +1,16 @@
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest import TestCase
+from unittest.mock import patch
 
 from articlepub.llm.base import LLMProvider
 from articlepub.llm.base import NoopProvider
 from articlepub.llm.types import LLMArticle
-from articlepub.models import Article, FetchResult
+from articlepub.models import Article, CalibreConfig, FetchResult
 from articlepub.pipeline import BuildOptions, build
 from articlepub.stats import LLMUsage
 from articlepub.text import assert_sentences_preserved
+from articlepub.upload import UploadResult
 
 
 FIXTURE = Path(__file__).parent / "fixtures" / "blog.html"
@@ -145,3 +147,28 @@ class PipelineTest(TestCase):
 
         with self.assertRaises(ValueError):
             assert_sentences_preserved(source, output)
+
+    def test_calibre_upload_stores_structured_upload_result(self) -> None:
+        upload_result = UploadResult(
+            response_text='{"location": "/calibre-web/book/35"}',
+            location="/calibre-web/book/35",
+            book_id=35,
+            book_url="http://calibre.example.test/calibre-web/book/35",
+        )
+
+        with TemporaryDirectory() as tmp:
+            with patch("articlepub.pipeline.CalibreWebUploader") as uploader_cls:
+                uploader_cls.return_value.upload_result.return_value = upload_result
+                result = build(
+                    BuildOptions(
+                        url=FIXTURE.as_uri(),
+                        output_dir=Path(tmp),
+                        fetch_mode="local",
+                        provider=NoopProvider(),
+                        calibre=CalibreConfig(base_url="http://calibre.example.test/calibre-web/"),
+                    )
+                )
+
+        self.assertTrue(result.uploaded)
+        self.assertEqual(result.upload_response, '{"location": "/calibre-web/book/35"}')
+        self.assertIs(result.upload_result, upload_result)

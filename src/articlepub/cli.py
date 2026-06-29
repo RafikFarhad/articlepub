@@ -9,7 +9,7 @@ from .diagnostics import DoctorOptions, run_doctor
 from .models import CalibreConfig
 from .pipeline import BuildOptions, build
 from .tui import run_tui
-from .upload import CalibreWebUploader
+from .upload import CalibreWebUploader, UploadResult
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -48,6 +48,7 @@ def _add(args: argparse.Namespace, ui: TerminalUI) -> int:
         max_tokens=args.llm_max_tokens,
     )
     calibre = _calibre_config(args) if args.calibre_url else None
+    upload_reporter = _UploadReporter(ui, buffered=True)
     ui.info(f"Fetch mode: {args.fetch_mode}")
     ui.info(f"Provider: {args.provider}")
     with ui.spinner("Building EPUB", "EPUB ready"):
@@ -61,65 +62,94 @@ def _add(args: argparse.Namespace, ui: TerminalUI) -> int:
                 provider=provider,
                 calibre=calibre,
                 log=ui.debug,
+                upload_progress=upload_reporter.progress,
                 store_metadata=args.store_metadata,
             )
         )
     ui.success(f"Saved {result.epub_path}")
     ui.report(result)
+    if calibre and result.upload_result:
+        if not upload_reporter.emitted:
+            upload_reporter.report_result(calibre, result.upload_result)
+        upload_reporter.report_final(result.upload_result)
+        upload_reporter.flush()
     print(result.epub_path)
-    if result.uploaded:
-        ui.success("Uploaded to Calibre-Web")
-        print("uploaded")
+    if result.upload_result:
+        print(result.upload_result.book_url or result.upload_result.location or "uploaded")
+        return 1 if result.upload_result.shelf_errors else 0
     return 0
 
 
 def _upload(args: argparse.Namespace, ui: TerminalUI) -> int:
     ui.banner()
     config = _calibre_config(args)
-    progress_emitted = False
-
-    def progress(level: str, message: str) -> None:
-        nonlocal progress_emitted
-        progress_emitted = True
-        if level == "success":
-            ui.success(message)
-        elif level == "warning":
-            ui.warning(message)
-        else:
-            ui.info(message)
+    upload_reporter = _UploadReporter(ui)
 
     try:
-        result = CalibreWebUploader(config, log=ui.debug, progress=progress).upload_result(Path(args.epub))
+        result = CalibreWebUploader(config, log=ui.debug, progress=upload_reporter.progress).upload_result(Path(args.epub))
     except Exception as exc:
         ui.error(f"Book upload failed: {exc}")
         return 1
 
-    if not progress_emitted:
-        _report_upload_result(config, result, ui)
-    if result.shelf_errors:
-        ui.warning("Book uploaded, but shelf update failed")
-    else:
-        ui.success("Book uploaded successfully")
+    if not upload_reporter.emitted:
+        upload_reporter.report_result(config, result)
+    upload_reporter.report_final(result)
     print(result.book_url or result.location or "uploaded")
     return 1 if result.shelf_errors else 0
 
 
-def _report_upload_result(config: CalibreConfig, result, ui: TerminalUI) -> None:
-    if config.username and config.password:
-        ui.success("Login succeeded")
-    else:
-        ui.info("Login skipped (anonymous mode)")
-    ui.success("Book uploaded")
-    if result.book_url:
-        ui.info(f"Book: {result.book_url}")
-    if config.shelf_names:
-        ui.info("Fetching shelves")
-    for shelf_name in result.shelves_added:
-        ui.success(f"Added to shelf: {shelf_name}")
-    for shelf_name in result.shelves_present:
-        ui.info(f"Already on shelf: {shelf_name}")
-    for error in result.shelf_errors:
-        ui.warning(f"Shelf update failed: {error}")
+class _UploadReporter:
+    def __init__(self, ui: TerminalUI, buffered: bool = False) -> None:
+        self.ui = ui
+        self.buffered = buffered
+        self.emitted = False
+        self.events: list[tuple[str, str]] = []
+
+    def progress(self, level: str, message: str) -> None:
+        self.emitted = True
+        self._record_or_emit(level, message)
+
+    def flush(self) -> None:
+        for level, message in self.events:
+            self._emit(level, message)
+        self.events.clear()
+
+    def report_result(self, config: CalibreConfig, result: UploadResult) -> None:
+        if config.username and config.password:
+            self._record_or_emit("success", "Login succeeded")
+        else:
+            self._record_or_emit("info", "Login skipped (anonymous mode)")
+        self._record_or_emit("success", "Book uploaded")
+        if result.book_url:
+            self._record_or_emit("info", f"Book: {result.book_url}")
+        if config.shelf_names:
+            self._record_or_emit("info", "Fetching shelves")
+        for shelf_name in result.shelves_added:
+            self._record_or_emit("success", f"Added to shelf: {shelf_name}")
+        for shelf_name in result.shelves_present:
+            self._record_or_emit("info", f"Already on shelf: {shelf_name}")
+        for error in result.shelf_errors:
+            self._record_or_emit("warning", f"Shelf update failed: {error}")
+
+    def report_final(self, result: UploadResult) -> None:
+        if result.shelf_errors:
+            self._record_or_emit("warning", "Book uploaded, but shelf update failed")
+        else:
+            self._record_or_emit("success", "Book uploaded successfully")
+
+    def _record_or_emit(self, level: str, message: str) -> None:
+        if self.buffered:
+            self.events.append((level, message))
+            return
+        self._emit(level, message)
+
+    def _emit(self, level: str, message: str) -> None:
+        if level == "success":
+            self.ui.success(message)
+        elif level == "warning":
+            self.ui.warning(message)
+        else:
+            self.ui.info(message)
 
 
 def _doctor(args: argparse.Namespace, ui: TerminalUI) -> int:

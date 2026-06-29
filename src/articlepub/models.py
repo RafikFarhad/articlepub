@@ -35,6 +35,7 @@ class BuildResult:
     stats: BuildStats = field(default_factory=BuildStats)
     uploaded: bool = False
     upload_response: str | None = None
+    upload_result: Any | None = None
 
 
 @dataclass(slots=True)
